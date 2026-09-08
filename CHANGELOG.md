@@ -5,6 +5,14 @@ All notable changes to the "Orochi Zen" Japanese Snake Game will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## [1.1.1] - 2026-09-08
+
+### Changed
+- **全局按键事件兼容性增强**: 在 `ZenCanvas.tsx` 中同时捕获 `e.code` 与 `e.key`（如 `KeyW`/`KeyA`/`KeyS`/`KeyD` 及方向键），彻底杜绝在不同输入法（中文/日文 IME）或不同键盘布局下的按键漏判。
+- **四向转向响应敏捷度提升**: 将四向模式 `turnSpeed` 提升至 0.65，使 90° 转向在 2 帧内俐落完成，杜绝转向漂移与延迟感。
+- **游弋模式疾驰加速**: 在模拟舵向模式中长按前进键（Up/W）可提升 50% 游弋航速。
+- **缓冲转向队列对齐**: 强化队列出队时的 180° 反向比对基准，确保绝对方向判定精度。
+
 ## [1.1.0] - 2026-09-08
 
 ### Fixed

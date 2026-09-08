@@ -74,12 +74,13 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       keysPressed.current[e.key] = true;
+      keysPressed.current[e.code] = true;
 
       const gm = gameManagerRef.current;
       if (!gm) return;
 
       // 空格暂停/继续
-      if (e.code === 'Space') {
+      if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         japaneseAudio.playHyoshigi(1.1);
         onStatusChange(status === 'playing' ? 'paused' : 'playing');
@@ -87,7 +88,7 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
       }
 
       // R 键重置
-      if (e.key === 'r' || e.key === 'R') {
+      if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         gm.reset();
         onStatusChange('playing');
@@ -96,27 +97,29 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
 
       if (status !== 'playing') return;
 
+      const isRight = e.code === 'ArrowRight' || e.code === 'KeyD' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
+      const isDown = e.code === 'ArrowDown' || e.code === 'KeyS' || e.key === 'ArrowDown' || e.key === 's' || e.key === 'S';
+      const isLeft = e.code === 'ArrowLeft' || e.code === 'KeyA' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A';
+      const isUp = e.code === 'ArrowUp' || e.code === 'KeyW' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W';
+
       // 四向模式下由 keydown 触发绝对朝向指引，规避帧循环中的偏转叠加死循环
       if (gm.controlMode === 'cardinal') {
-        if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        if (isRight) {
           e.preventDefault();
           gm.snake.setDirection(0);
-        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        } else if (isDown) {
           e.preventDefault();
           gm.snake.setDirection(Math.PI / 2);
-        } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        } else if (isLeft) {
           e.preventDefault();
           gm.snake.setDirection(Math.PI);
-        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        } else if (isUp) {
           e.preventDefault();
           gm.snake.setDirection(-Math.PI / 2);
         }
       } else {
         // 模拟舵向模式阻止方向键滚动页面
-        if (
-          e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
-          e.key === 'ArrowUp' || e.key === 'ArrowDown'
-        ) {
+        if (isRight || isDown || isLeft || isUp) {
           e.preventDefault();
         }
       }
@@ -124,6 +127,7 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
 
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current[e.key] = false;
+      keysPressed.current[e.code] = false;
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -202,11 +206,20 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
           // 仅在模拟舵向模式下根据长按偏转，避免四向经典模式下的连击自旋
           if (gm.controlMode === 'analog') {
             const steerRate = 3.2; // 弧度/秒
-            if (keysPressed.current['ArrowLeft'] || keysPressed.current['a'] || keysPressed.current['A']) {
+            const leftPressed = keysPressed.current['ArrowLeft'] || keysPressed.current['KeyA'] || keysPressed.current['a'] || keysPressed.current['A'];
+            const rightPressed = keysPressed.current['ArrowRight'] || keysPressed.current['KeyD'] || keysPressed.current['d'] || keysPressed.current['D'];
+            const upPressed = keysPressed.current['ArrowUp'] || keysPressed.current['KeyW'] || keysPressed.current['w'] || keysPressed.current['W'];
+
+            if (leftPressed) {
               gm.snake.steerByDelta(-steerRate * dt);
             }
-            if (keysPressed.current['ArrowRight'] || keysPressed.current['d'] || keysPressed.current['D']) {
+            if (rightPressed) {
               gm.snake.steerByDelta(steerRate * dt);
+            }
+            if (upPressed) {
+              gm.snake.currentSpeed = gm.snake.baseSpeed * 1.5;
+            } else {
+              gm.snake.currentSpeed = gm.snake.baseSpeed;
             }
           }
 

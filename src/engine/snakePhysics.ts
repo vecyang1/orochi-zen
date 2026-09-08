@@ -40,7 +40,7 @@ export class SnakePhysics {
   public segments: SnakeSegment[] = [];
   public segmentDist: number = 11; // 节距
   public totalLength: number = 18; // 初始节数
-  public turnSpeed: number = 0.35; // 经典四向敏捷度（响应迅速俐落）
+  public turnSpeed: number = 0.65; // 经典四向敏捷度（响应迅疾俐落，极速换向无拖泥带水）
   public analogTurnSpeed: number = 0.16; // 模拟舵向平滑度
   public controlMode: ControlMode = 'cardinal';
   public turnQueue: number[] = [];
@@ -179,9 +179,9 @@ export class SnakePhysics {
     // 处理四向模式转弯缓冲队列 (Turn Queue)
     if (this.controlMode === 'cardinal' && this.turnQueue.length > 0) {
       const angleError = Math.abs(angleDiff(this.targetAngle, this.angle));
-      if (angleError < 0.3) {
+      if (angleError < 0.35) {
         const nextDir = this.turnQueue.shift()!;
-        if (!isOppositeAngle(nextDir, this.angle)) {
+        if (!isOppositeAngle(nextDir, this.targetAngle)) {
           this.applyDirection(nextDir);
         }
       }
