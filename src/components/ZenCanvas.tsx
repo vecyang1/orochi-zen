@@ -2,12 +2,13 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { GameManager } from '../engine/gameManager';
-import { GameStatus, GameMode, JapaneseTheme, GameStats } from '../engine/types';
+import { GameStatus, GameMode, JapaneseTheme, GameStats, ControlMode } from '../engine/types';
 import { japaneseAudio } from '../audio/japaneseSynth';
 
 interface ZenCanvasProps {
   mode: GameMode;
   theme: JapaneseTheme;
+  controlMode: ControlMode;
   status: GameStatus;
   onStatusChange: (status: GameStatus) => void;
   onStatsUpdate: (stats: GameStats, quote: string) => void;
@@ -17,6 +18,7 @@ interface ZenCanvasProps {
 export const ZenCanvas: React.FC<ZenCanvasProps> = ({
   mode,
   theme,
+  controlMode,
   status,
   onStatusChange,
   onStatsUpdate,
@@ -26,15 +28,17 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
   const animationFrameId = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(performance.now());
   const keysPressed = useRef<{ [key: string]: boolean }>({});
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  // 初始化 GameManager
+  // 初始化并同步 GameManager 参数
   useEffect(() => {
     if (!gameManagerRef.current) {
       gameManagerRef.current = new GameManager(800, 600);
     }
     gameManagerRef.current.setMode(mode);
     gameManagerRef.current.setTheme(theme);
-  }, [mode, theme, gameManagerRef]);
+    gameManagerRef.current.setControlMode(controlMode);
+  }, [mode, theme, controlMode, gameManagerRef]);
 
   // 处理窗口/画布尺寸自适应与 Retina 屏幕高清缩放
   const handleResize = useCallback(() => {
@@ -71,7 +75,6 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       keysPressed.current[e.key] = true;
 
-      // 快速触发方向
       const gm = gameManagerRef.current;
       if (!gm) return;
 
@@ -85,6 +88,7 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
 
       // R 键重置
       if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
         gm.reset();
         onStatusChange('playing');
         return;
@@ -92,15 +96,29 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
 
       if (status !== 'playing') return;
 
-      // 绝对方向指引
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        gm.snake.setDirection(0);
-      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-        gm.snake.setDirection(Math.PI / 2);
-      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        gm.snake.setDirection(Math.PI);
-      } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-        gm.snake.setDirection(-Math.PI / 2);
+      // 四向模式下由 keydown 触发绝对朝向指引，规避帧循环中的偏转叠加死循环
+      if (gm.controlMode === 'cardinal') {
+        if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          gm.snake.setDirection(0);
+        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          gm.snake.setDirection(Math.PI / 2);
+        } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          gm.snake.setDirection(Math.PI);
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          gm.snake.setDirection(-Math.PI / 2);
+        }
+      } else {
+        // 模拟舵向模式阻止方向键滚动页面
+        if (
+          e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+          e.key === 'ArrowUp' || e.key === 'ArrowDown'
+        ) {
+          e.preventDefault();
+        }
       }
     };
 
@@ -115,6 +133,55 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [status, onStatusChange, gameManagerRef]);
+
+  // 触屏轻扫手势监听 (Mobile Swipes on Canvas)
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        time: performance.now()
+      };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!touchStartRef.current || status !== 'playing' || !gameManagerRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist >= 24) {
+      const angle = Math.atan2(dy, dx);
+      gameManagerRef.current.snake.setDirection(angle);
+      // 更新锚点支持连贯拐弯
+      touchStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        time: performance.now()
+      };
+    }
+  }, [status, gameManagerRef]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!touchStartRef.current || status !== 'playing' || !gameManagerRef.current) {
+      touchStartRef.current = null;
+      return;
+    }
+    if (e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist >= 16) {
+        const angle = Math.atan2(dy, dx);
+        gameManagerRef.current.snake.setDirection(angle);
+      }
+    }
+    touchStartRef.current = null;
+  }, [status, gameManagerRef]);
 
   // 主循环 (requestAnimationFrame 60-120FPS)
   useEffect(() => {
@@ -131,13 +198,16 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
 
       const gm = gameManagerRef.current;
       if (gm) {
-        // 键盘长按微操连续偏转
         if (status === 'playing') {
-          if (keysPressed.current['ArrowLeft'] || keysPressed.current['a'] || keysPressed.current['A']) {
-            gm.snake.steerByDelta(-0.065);
-          }
-          if (keysPressed.current['ArrowRight'] || keysPressed.current['d'] || keysPressed.current['D']) {
-            gm.snake.steerByDelta(0.065);
+          // 仅在模拟舵向模式下根据长按偏转，避免四向经典模式下的连击自旋
+          if (gm.controlMode === 'analog') {
+            const steerRate = 3.2; // 弧度/秒
+            if (keysPressed.current['ArrowLeft'] || keysPressed.current['a'] || keysPressed.current['A']) {
+              gm.snake.steerByDelta(-steerRate * dt);
+            }
+            if (keysPressed.current['ArrowRight'] || keysPressed.current['d'] || keysPressed.current['D']) {
+              gm.snake.steerByDelta(steerRate * dt);
+            }
           }
 
           const gameOver = gm.update(dt);
@@ -170,6 +240,10 @@ export const ZenCanvas: React.FC<ZenCanvasProps> = ({
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       <canvas
         ref={canvasRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className="w-full h-full block cursor-crosshair touch-none select-none"
       />
     </div>

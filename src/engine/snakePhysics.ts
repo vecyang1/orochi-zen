@@ -1,4 +1,35 @@
-import { SnakeSegment, Vector2D, GameMode } from './types';
+import { SnakeSegment, Vector2D, GameMode, ControlMode } from './types';
+
+export function normalizeAngle(rad: number): number {
+  let a = rad % (Math.PI * 2);
+  if (a > Math.PI) a -= Math.PI * 2;
+  if (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+export function angleDiff(a: number, b: number): number {
+  let diff = a - b;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  return diff;
+}
+
+export function isOppositeAngle(a: number, b: number, thresholdCos = -0.7): boolean {
+  return Math.cos(a - b) < thresholdCos;
+}
+
+export function snapToNearestCardinal(rad: number): number {
+  const normalized = normalizeAngle(rad);
+  if (normalized >= -Math.PI / 4 && normalized < Math.PI / 4) {
+    return 0; // East
+  } else if (normalized >= Math.PI / 4 && normalized < (3 * Math.PI) / 4) {
+    return Math.PI / 2; // South
+  } else if (normalized >= (-3 * Math.PI) / 4 && normalized < -Math.PI / 4) {
+    return -Math.PI / 2; // North
+  } else {
+    return Math.PI; // West
+  }
+}
 
 export class SnakePhysics {
   public head: Vector2D = { x: 400, y: 300 };
@@ -8,8 +39,13 @@ export class SnakePhysics {
   public currentSpeed: number = 3.6;
   public segments: SnakeSegment[] = [];
   public segmentDist: number = 11; // 节距
-  public totalLength: number = 16; // 初始节数
-  public turnSpeed: number = 0.095; // 转向敏捷度
+  public totalLength: number = 18; // 初始节数
+  public turnSpeed: number = 0.35; // 经典四向敏捷度（响应迅速俐落）
+  public analogTurnSpeed: number = 0.16; // 模拟舵向平滑度
+  public controlMode: ControlMode = 'cardinal';
+  public turnQueue: number[] = [];
+  public maxQueueSize: number = 2;
+  public lastCommittedDirection: number = 0;
   public timeAlive: number = 0;
   public setsunaTime: number = 0; // 刹那缓时倒计时
 
@@ -26,6 +62,8 @@ export class SnakePhysics {
     this.totalLength = length;
     this.timeAlive = 0;
     this.setsunaTime = 0;
+    this.turnQueue = [];
+    this.lastCommittedDirection = 0;
     this.segments = [];
 
     // 初始化初始节
@@ -39,15 +77,73 @@ export class SnakePhysics {
     }
   }
 
-  public setDirection(rad: number) {
-    // 限制单次突变过大，保持和风蛇形游弋的自然物理惯性
-    let diff = rad - this.targetAngle;
+  public setControlMode(mode: ControlMode) {
+    this.controlMode = mode;
+    this.turnQueue = [];
+  }
+
+  public inputCardinalDirection(rad: number): boolean {
+    const normalized = normalizeAngle(rad);
+
+    // 以队列末尾或当前目标朝向为基准
+    const reference = this.turnQueue.length > 0
+      ? this.turnQueue[this.turnQueue.length - 1]
+      : this.targetAngle;
+
+    // 1. 重复方向忽略
+    if (Math.abs(angleDiff(normalized, reference)) < 0.05) {
+      return false;
+    }
+
+    // 2. 180度反向防回头锁死保护（严格杜绝咬脖自噬）
+    if (isOppositeAngle(normalized, reference)) {
+      return false;
+    }
+
+    // 3. 检查当前蛇头是否已大致对准当前目标角
+    const angleError = Math.abs(angleDiff(this.targetAngle, this.angle));
+    if (this.turnQueue.length === 0 && angleError <= 0.35) {
+      this.applyDirection(normalized);
+      return true;
+    }
+
+    // 否则加入转向缓冲队列，防止快速双击丢键
+    if (this.turnQueue.length < this.maxQueueSize) {
+      this.turnQueue.push(normalized);
+      return true;
+    }
+
+    return false;
+  }
+
+  public setAnalogDirection(rad: number) {
+    const normalized = normalizeAngle(rad);
+    let diff = normalized - this.targetAngle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
     this.targetAngle += diff;
   }
 
+  public applyDirection(rad: number) {
+    let diff = rad - this.targetAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    this.targetAngle += diff;
+    this.lastCommittedDirection = rad;
+  }
+
+  public setDirection(rad: number) {
+    if (this.controlMode === 'cardinal') {
+      const cardinalAngle = snapToNearestCardinal(rad);
+      this.inputCardinalDirection(cardinalAngle);
+    } else {
+      this.setAnalogDirection(rad);
+    }
+  }
+
   public steerByDelta(deltaRad: number) {
+    // 经典四向模式下严禁混入微操偏转，防止方向死循环与剧烈自旋
+    if (this.controlMode !== 'analog') return;
     this.targetAngle += deltaRad;
   }
 
@@ -80,11 +176,23 @@ export class SnakePhysics {
 
     const effectiveDt = dt * timeScale;
 
-    // 角度渐进平滑插值（带自然惯性）
-    let angleDiff = this.targetAngle - this.angle;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    this.angle += angleDiff * Math.min(1.0, this.turnSpeed * (60 * effectiveDt));
+    // 处理四向模式转弯缓冲队列 (Turn Queue)
+    if (this.controlMode === 'cardinal' && this.turnQueue.length > 0) {
+      const angleError = Math.abs(angleDiff(this.targetAngle, this.angle));
+      if (angleError < 0.3) {
+        const nextDir = this.turnQueue.shift()!;
+        if (!isOppositeAngle(nextDir, this.angle)) {
+          this.applyDirection(nextDir);
+        }
+      }
+    }
+
+    // 角度渐进平滑插值（根据模式匹配敏捷响应与自然惯性）
+    const activeTurnSpeed = this.controlMode === 'cardinal' ? this.turnSpeed : this.analogTurnSpeed;
+    let angleDiffVal = this.targetAngle - this.angle;
+    while (angleDiffVal < -Math.PI) angleDiffVal += Math.PI * 2;
+    while (angleDiffVal > Math.PI) angleDiffVal -= Math.PI * 2;
+    this.angle += angleDiffVal * Math.min(1.0, activeTurnSpeed * (60 * effectiveDt));
 
     // 推进头部位置
     const speed = this.currentSpeed * (60 * effectiveDt);

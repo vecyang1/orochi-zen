@@ -1,13 +1,13 @@
-'use client';
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { ControlMode } from '../engine/types';
 
 interface TouchControlsProps {
   onSteer: (rad: number) => void;
   isDark: boolean;
+  controlMode?: ControlMode;
 }
 
-export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark }) => {
+export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark, controlMode = 'cardinal' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
@@ -15,6 +15,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark })
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
     if (touchIdRef.current !== null) return;
     const touch = e.changedTouches[0];
     touchIdRef.current = touch.identifier;
@@ -43,12 +44,13 @@ export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark })
       y: Math.sin(angle) * clampedDist
     });
 
-    if (dist > 8) {
+    if (dist > 10) {
       onSteer(angle);
     }
   }, [onSteer]);
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation();
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === touchIdRef.current) {
@@ -59,6 +61,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark })
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchIdRef.current) {
         touchIdRef.current = null;
@@ -96,10 +99,24 @@ export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark })
     >
       {/* 虚拟罗盘同心墨环 */}
       <div
-        className={`w-24 h-24 rounded-full border border-dashed transition-colors ${
+        className={`w-24 h-24 rounded-full border border-dashed relative transition-colors ${
           isDark ? 'border-amber-500/30' : 'border-red-600/30'
         }`}
-      />
+      >
+        {/* 四向刻度标记 (仅在四向模式突出显示，游弋模式淡化) */}
+        <span className={`absolute -top-1.5 left-1/2 -translate-x-1/2 text-[9px] font-mono leading-none ${
+          controlMode === 'cardinal' ? (isDark ? 'text-amber-400 font-bold' : 'text-red-600 font-bold') : 'opacity-30'
+        }`}>北</span>
+        <span className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] font-mono leading-none ${
+          controlMode === 'cardinal' ? (isDark ? 'text-amber-400 font-bold' : 'text-red-600 font-bold') : 'opacity-30'
+        }`}>南</span>
+        <span className={`absolute top-1/2 -left-1.5 -translate-y-1/2 text-[9px] font-mono leading-none ${
+          controlMode === 'cardinal' ? (isDark ? 'text-amber-400 font-bold' : 'text-red-600 font-bold') : 'opacity-30'
+        }`}>西</span>
+        <span className={`absolute top-1/2 -right-1.5 -translate-y-1/2 text-[9px] font-mono leading-none ${
+          controlMode === 'cardinal' ? (isDark ? 'text-amber-400 font-bold' : 'text-red-600 font-bold') : 'opacity-30'
+        }`}>东</span>
+      </div>
 
       {/* 摇杆中心操纵钮 */}
       <div
@@ -129,7 +146,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({ onSteer, isDark })
           isDark ? 'text-neutral-500' : 'text-stone-500'
         }`}
       >
-        触控罗盘
+        {controlMode === 'cardinal' ? '四向罗盘' : '游弋罗盘'}
       </span>
     </div>
   );

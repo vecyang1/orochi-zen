@@ -51,6 +51,7 @@ export interface Particle {
 export type GameMode = 'zen' | 'trial';
 export type GameStatus = 'idle' | 'playing' | 'paused' | 'gameover';
 export type JapaneseTheme = 'sumi_dark' | 'washi_light';
+export type ControlMode = 'cardinal' | 'analog';
 
 export interface GameStats {
   score: number;

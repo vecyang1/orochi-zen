@@ -1,4 +1,4 @@
-import { Collectible, Obstacle, GameMode, GameStats, JapaneseTheme } from './types';
+import { Collectible, Obstacle, GameMode, GameStats, JapaneseTheme, ControlMode } from './types';
 import { SnakePhysics } from './snakePhysics';
 import { ParticleSystem } from './particleSystem';
 import { japaneseAudio } from '../audio/japaneseSynth';
@@ -21,6 +21,7 @@ export class GameManager {
   public obstacles: Obstacle[] = [];
   public mode: GameMode = 'zen';
   public theme: JapaneseTheme = 'sumi_dark';
+  public controlMode: ControlMode = 'cardinal';
   public stats: GameStats = {
     score: 0,
     highScore: 0,
@@ -75,8 +76,14 @@ export class GameManager {
     this.theme = newTheme;
   }
 
+  public setControlMode(newMode: ControlMode) {
+    this.controlMode = newMode;
+    this.snake.setControlMode(newMode);
+  }
+
   public reset() {
     this.snake.reset(this.width / 2, this.height / 2, 18);
+    this.snake.setControlMode(this.controlMode);
     this.collectibles = [];
     this.obstacles = [];
     this.stats.score = 0;

@@ -5,13 +5,14 @@ import { ZenCanvas } from '../components/ZenCanvas';
 import { GameHUD } from '../components/GameHUD';
 import { TouchControls } from '../components/TouchControls';
 import { GameManager, ZEN_QUOTES } from '../engine/gameManager';
-import { GameMode, GameStatus, JapaneseTheme, GameStats } from '../engine/types';
+import { GameMode, GameStatus, JapaneseTheme, GameStats, ControlMode } from '../engine/types';
 import { japaneseAudio } from '../audio/japaneseSynth';
 import { Sparkles, Play } from 'lucide-react';
 
 export default function HomePage() {
   const [mode, setMode] = useState<GameMode>('zen');
   const [theme, setTheme] = useState<JapaneseTheme>('sumi_dark');
+  const [controlMode, setControlMode] = useState<ControlMode>('cardinal');
   const [status, setStatus] = useState<GameStatus>('idle');
   const [stats, setStats] = useState<GameStats>({
     score: 0,
@@ -61,6 +62,7 @@ export default function HomePage() {
       <ZenCanvas
         mode={mode}
         theme={theme}
+        controlMode={controlMode}
         status={status}
         onStatusChange={setStatus}
         onStatsUpdate={handleStatsUpdate}
@@ -73,9 +75,11 @@ export default function HomePage() {
         quote={quote}
         mode={mode}
         theme={theme}
+        controlMode={controlMode}
         status={status}
         onModeChange={setMode}
         onThemeChange={setTheme}
+        onControlModeChange={setControlMode}
         onStatusChange={setStatus}
         onRestart={handleRestart}
       />
@@ -83,7 +87,7 @@ export default function HomePage() {
       {/* 移动端/触屏专属罗盘操纵杆 (桌面端屏幕宽度大时淡化或藏于右下角) */}
       {status === 'playing' && (
         <div className="absolute bottom-16 right-6 sm:bottom-20 sm:right-10 z-20 opacity-90 hover:opacity-100 transition-opacity">
-          <TouchControls onSteer={handleTouchSteer} isDark={isDark} />
+          <TouchControls onSteer={handleTouchSteer} isDark={isDark} controlMode={controlMode} />
         </div>
       )}
 

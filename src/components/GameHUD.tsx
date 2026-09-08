@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState } from 'react';
-import { GameMode, GameStatus, JapaneseTheme, GameStats } from '../engine/types';
+import { GameMode, GameStatus, JapaneseTheme, GameStats, ControlMode } from '../engine/types';
 import {
   Volume2,
   VolumeX,
@@ -16,6 +14,8 @@ import {
   Info,
   Maximize2,
   Minimize2,
+  Compass,
+  Navigation,
   X
 } from 'lucide-react';
 import { japaneseAudio } from '../audio/japaneseSynth';
@@ -25,9 +25,11 @@ interface GameHUDProps {
   quote: string;
   mode: GameMode;
   theme: JapaneseTheme;
+  controlMode: ControlMode;
   status: GameStatus;
   onModeChange: (mode: GameMode) => void;
   onThemeChange: (theme: JapaneseTheme) => void;
+  onControlModeChange: (mode: ControlMode) => void;
   onStatusChange: (status: GameStatus) => void;
   onRestart: () => void;
 }
@@ -37,9 +39,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   quote,
   mode,
   theme,
+  controlMode,
   status,
   onModeChange,
   onThemeChange,
+  onControlModeChange,
   onStatusChange,
   onRestart
 }) => {
@@ -69,6 +73,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const handleModeSwitch = (targetMode: GameMode) => {
     japaneseAudio.playHyoshigi(1.2);
     onModeChange(targetMode);
+  };
+
+  const handleControlModeSwitch = (targetControlMode: ControlMode) => {
+    japaneseAudio.playHyoshigi(1.05);
+    onControlModeChange(targetControlMode);
   };
 
   const handleThemeSwitch = () => {
@@ -102,6 +111,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <div className="flex items-center gap-2 text-[11px] font-mono tracking-wider opacity-60">
               <span>{mode === 'zen' ? '✦ 禅境心流' : '⚔ 修罗试练'}</span>
               <span>•</span>
+              <span>{controlMode === 'cardinal' ? '四向经典' : '游弋舵向'}</span>
+              <span>•</span>
               <span>{isDark ? '玄墨' : '素纸'}</span>
             </div>
           </div>
@@ -109,7 +120,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* 交互按钮组 */}
         <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
-          {/* 模式切换 */}
+          {/* 模式切换 (禅境 / 修罗) */}
           <button
             onClick={() => handleModeSwitch(mode === 'zen' ? 'trial' : 'zen')}
             title="切换模式 (禅境 / 试练)"
@@ -128,6 +139,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <>
                 <Swords className="w-3.5 h-3.5 text-red-500" />
                 <span className="hidden sm:inline">修罗</span>
+              </>
+            )}
+          </button>
+
+          {/* 操控模式切换 (四向经典 / 游弋舵向) */}
+          <button
+            onClick={() => handleControlModeSwitch(controlMode === 'cardinal' ? 'analog' : 'cardinal')}
+            title="操控模式切换 (四向经典 / 游弋舵向)"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-serif transition-all duration-200 border ${
+              isDark
+                ? 'bg-neutral-900/80 hover:bg-neutral-800 border-neutral-700 text-stone-200'
+                : 'bg-stone-100/90 hover:bg-stone-200 border-stone-300 text-stone-800 shadow-sm'
+            }`}
+          >
+            {controlMode === 'cardinal' ? (
+              <>
+                <Compass className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">四向</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="w-3.5 h-3.5 text-teal-400" />
+                <span className="hidden sm:inline">舵向</span>
               </>
             )}
           </button>
@@ -252,7 +286,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 : 'bg-stone-200/60 border-stone-300 text-stone-600'
             }`}
           >
-            <span>[WASD/方向键] 游弋</span>
+            <span>
+              {controlMode === 'cardinal' ? '[WASD/方向键] 四向转向' : '[A/D 或 ←/→] 舵向偏转'}
+            </span>
             <span>•</span>
             <span>[空格] 暂停</span>
             <span>•</span>
@@ -423,9 +459,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
               <div>
                 <div className="font-bold text-amber-400 mb-1">三、操控法则</div>
-                <p>
-                  • <strong>电脑键盘</strong>：WASD / 方向键转向；长按左右键可亚像素连续平滑偏转。<br />
-                  • <strong>触屏设备</strong>：支持下方虚拟和风触控罗盘，360° 无极游弋。
+                <p className="mb-2">
+                  • <strong>四向经典模式 (Cardinal)</strong>：WASD 或方向键利落转向，内置 180° 防回头反向锁死（杜绝咬脖自噬）与高速按键缓冲队列；支持移动端画布轻扫与虚拟十字吸附罗盘。<br />
+                  • <strong>游弋舵向模式 (Analog)</strong>：360° 无极流线型游弋，键盘 A/D 或左右方向键微操偏转，配合虚拟和风触控罗盘无极操舵。<br />
+                  • <strong>通用快捷键</strong>：[空格] 暂停/继续，[R] 快速重置，顶部按钮随心切换模式与黑白意境。
                 </p>
               </div>
             </div>

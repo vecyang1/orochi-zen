@@ -5,6 +5,26 @@ All notable changes to the "Orochi Zen" Japanese Snake Game will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## [1.1.0] - 2026-09-08
+
+### Fixed
+- **按键长按死循环自旋冲突修复**: 彻底消除 `keydown` 设置绝对四向角与 `requestAnimationFrame` 游戏循环持续触发 `steerByDelta` 造成的剧烈自旋冲突，恢复经典俐落转向体验。
+- **180° 反向防回头锁死保护**: 增加几何余弦判定保护机制（`thresholdCos = -0.7`），杜绝蛇头向后咬向颈脖自噬。
+- **边界角度规范化修复**: 修复 `normalizeAngle` 在 `-PI` 边界下的模数翻转问题。
+
+### Added
+- **四向/舵向双操控模式架构 (Dual Control Architecture)**:
+  - 经典四向模式 (`cardinal`)：WASD / 方向键俐落转向，支持极速双键转向缓冲队列 (`turnQueue`)，防丢键与自噬；
+  - 游弋舵向模式 (`analog`)：360° 流畅平滑游弋，A/D 或左右键微操偏转，帧率无关物理角速度计算。
+  - 顶栏 HUD 新增操控模式即时切换开关与状态指示。
+- **全屏轻扫与虚拟罗盘触控升级**:
+  - 画布原生支持移动端单指轻扫 (Canvas Swipe) 转向手势，支持连续滑动转弯；
+  - 触控罗盘新增四向刻度标记与十字吸附提示，阻止触摸事件穿透冲突。
+- **完整自动化物理单元测试套件**:
+  - 引入 Vitest 自动化单元测试框架，覆盖角度正规化、反向锁死、转向队列缓冲、模式隔离与四向吸附判定。
+- **高精视觉截图呈现**:
+  - 仓库内嵌入多终端全景高精截图，并在 README 中视觉呈现。
+
 ## [1.0.0] - 2026-09-08
 
 ### Added
